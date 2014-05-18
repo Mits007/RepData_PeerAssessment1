@@ -1,20 +1,112 @@
 # Reproducible Research: Peer Assessment 1
+==========================================
 
-
+```{r setparam, echo = FALSE}
+opts_chunk$set(echo = TRUE)
+```
 ## Loading and preprocessing the data
-
-
+```{r}
+data_file = read.csv("./activity.csv", stringsAsFactors = FALSE, header = TRUE, na.string = "NA")
+data_file$date = as.Date(data_file$date)
+```
 
 ## What is mean total number of steps taken per day?
+```{r meanandmedian}
+library(reshape)
+datamelt = melt(data_file, id = c("date"), measure.vars = c("steps"))
+steps_count = cast(datamelt, date ~ variable, sum)
+```
 
+- Plot the Histogram
+```{r plothistogram, fig.height = 8, fig.width = 16}
+plot(steps_count, type = "h", lwd = 20)
+```
 
+- Calculate and report the mean steps taken every day
+```{r meansteps}
+meansteps = cast(datamelt, date ~ variable, mean, na.rm = TRUE)
+names(meansteps) = c("date", "mean_steps")
+print(meansteps)
+```
+
+- Calculate and report the median steps taken every day
+```{r medianvalue}
+mediansteps = cast(datamelt, date ~ variable, median, na.rm = TRUE)
+names(mediansteps) = c("date", "median_steps")
+print(mediansteps)
+```
 
 ## What is the average daily activity pattern?
+```{r}
+datamelt2 = melt(data_file, id = c("interval"), measure.vars = c("steps"))
+average_steps = cast(datamelt2, interval ~ variable, mean, na.rm = TRUE)
+names(average_steps) = c("interval", "avsteps")
+```
 
+- Plot the timeseries
+```{r plottimeseries, fig.height = 8, fig.width = 16}
+plot(average_steps, type = "l")
+```
 
-
+- Calculate max # of steps for an interval across all days 
+```{r caclmax}
+max_value = max(average_steps$avsteps)
+interval_number = average_steps[average_steps$avsteps == max_value, "interval"]
+cat("The interval with max number of steps averaged across all days is = ", 
+    interval_number)
+```
 ## Imputing missing values
 
+-Missing Values
+```{r missingvalues}
+num_complete_cases = sum(!complete.cases(data_file))
+cat("No. of missing values is=", num_complete_cases)
+```
+- Create new dataset with missing values filled in: The strategy is to fill up the missing values with the mean for that 5-minute interval. The code iterates over the entire dataset. Wherever the # of steps is NA, it fills it up with the mean value of the steps taken in that 5-minute interval
+```{r createnewdataset}
+new_data_file = data_file
+for (i in 1:nrow(data_file)) {
+    if (is.na(data_file[i, "steps"])) {
+        key_interval = data_file[i, "interval"]
+        new_data_file[i, "steps"] = average_steps[average_steps$interval == 
+            key_interval, "avsteps"]
+    }
+}
+```
 
+- Histogram of NEW total # of steps taken each day
+```{r newtotalsteps, fig.height = 8, fig.width = 16}
+new_datamelt = melt(new_data_file, id = c("date"), measure.vars = c("steps"))
+steps_count = cast(new_datamelt, date ~ variable, sum)
+plot(steps_count, type = "h", lwd = 20)
+```
+
+- Calculate the new mean steps taken per day
+```{r newmean}
+new_meansteps = cast(new_datamelt, date ~ variable, mean, na.rm = TRUE)
+names(new_meansteps) = c("date", "mean_steps")
+print(new_meansteps)
+```
+
+- Calculate the new median steps taken per day
+```{r newmedian}
+new_mediansteps = cast(new_datamelt, date ~ variable, median, na.rm = TRUE)
+names(new_mediansteps) = c("date", "median_steps")
+print(new_mediansteps)
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+- Create a new factor variable in the dataset with levels - weekday and weekend
+```{r createfactorvariable}
+new_data_file$weekdays = ifelse(weekdays(new_data_file$date) %in% c("Saturday", "Sunday"), "weekend", "weekday")
+```
+- Calculate the mean # of steps over weekday and weekend
+```{r}
+datamelt3 = melt(new_data_file, id = c("interval", "weekdays"), measure.vars = c("steps"))
+avg_steps = cast(datamelt3, interval + weekdays ~ variable, mean)
+```
+- Plot the mean steps for weekend and weekday
+```{r plotweekdaysmean, fig.height= 8, fig.width = 16}
+library(lattice)
+xyplot(avg_steps$steps ~ avg_steps$interval | avg_steps$weekdays, data = avg_steps, layout = c(1, 2), type = "l", xlab = "Interval", ylab = "Number of Steps")
+```
